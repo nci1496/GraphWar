@@ -352,6 +352,7 @@ class GraphWarAI:
             node.ruin_origin_defense = 0
             node.ruin_origin_max_defense = 0
             node.morale = max(35.0, min(55.0, node.morale))
+            game.refresh_node_display_name(node)
             return True
         return False
 

@@ -383,12 +383,14 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
             old_capital.site_type = TOWN
             old_capital.max_defense = max(0, old_capital.max_defense - 2)
             old_capital.defense = min(old_capital.defense, old_capital.max_defense)
+            self.refresh_node_display_name(old_capital)
         node.site_type = CAPITAL
         node.max_defense += 2
         node.defense = min(node.max_defense, node.defense + 2)
         node.max_population = max(node.max_population, SITE_STATS[CAPITAL]["population"][1])
         node.max_gold = self.capital_gold_cap(node)
         node.gold = min(node.gold, node.max_gold)
+        self.refresh_node_display_name(node)
         self.capital_node_ids[owner] = node.id
         emperor = self.emperors.get(owner)
         if emperor is not None and emperor.alive:
@@ -626,6 +628,7 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
         node.max_defense = max(node.max_defense, int(data["defense"]))
         node.max_defense = min(node.max_defense, self.defense_cap(node))
         node.defense = max(node.defense, math.ceil(node.max_defense * 0.75))
+        self.refresh_node_display_name(node)
 
     def try_repair_road(self, target: Node, from_pending: bool = False) -> None:
         if self.selected is None:

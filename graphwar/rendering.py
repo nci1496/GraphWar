@@ -52,6 +52,7 @@ class RenderingMixin:
         self.draw_top_bar()
         self.draw_edges()
         self.draw_convoys()
+        self.draw_emperors()
         self.draw_troops()
         self.draw_nodes()
         self.draw_left_panel()
@@ -136,7 +137,8 @@ class RenderingMixin:
                 pygame.draw.line(self.screen, COLORS["bad"], (pos[0] - radius, pos[1] - radius), (pos[0] + radius, pos[1] + radius), 3)
                 pygame.draw.line(self.screen, COLORS["bad"], (pos[0] + radius, pos[1] - radius), (pos[0] - radius, pos[1] + radius), 3)
             self.draw_centered_text(str(int(node.soldiers)), pygame.Rect(node.x - 30, node.y - 15, 60, 22), COLORS["white"], self.font)
-            self.draw_centered_text(development_name(node), pygame.Rect(node.x - 36, node.y + radius + 2, 72, 18), COLORS["muted"], self.small_font)
+            node_text = node.display_name if node.display_name else development_name(node)
+            self.draw_centered_text(node_text, pygame.Rect(node.x - 42, node.y + radius + 2, 84, 18), COLORS["muted"], self.small_font)
             if node.max_population > 0:
                 self.draw_centered_text(f"民{int(node.morale)}", pygame.Rect(node.x - 25, node.y - radius - 22, 50, 18), COLORS["gold"], self.small_font)
             if node.rebel_warning:
@@ -147,6 +149,28 @@ class RenderingMixin:
                 pygame.draw.circle(self.screen, COLORS["white"], marker_center, 10)
                 pygame.draw.circle(self.screen, COLORS[emperor_owner], marker_center, 8)
                 self.draw_centered_text("帝", pygame.Rect(marker_center[0] - 8, marker_center[1] - 8, 16, 16), COLORS["black"], self.small_font)
+
+    def draw_emperors(self) -> None:
+        for owner, emperor in self.emperors.items():
+            if not emperor.alive:
+                continue
+            if emperor.current_node >= 0:
+                continue
+            if len(emperor.route) < 2 or emperor.route_index >= len(emperor.route) - 1:
+                continue
+            a = emperor.route[emperor.route_index]
+            b = emperor.route[emperor.route_index + 1]
+            if a < 0 or b < 0 or a >= len(self.nodes) or b >= len(self.nodes):
+                continue
+            src = self.nodes[a]
+            dst = self.nodes[b]
+            x = lerp(src.x, dst.x, emperor.progress)
+            y = lerp(src.y, dst.y, emperor.progress)
+            pos = (round(x), round(y))
+            pygame.draw.circle(self.screen, COLORS["white"], pos, 11)
+            pygame.draw.circle(self.screen, COLORS[owner], pos, 9)
+            pygame.draw.circle(self.screen, COLORS["black"], pos, 9, 1)
+            self.draw_centered_text("帝", pygame.Rect(x - 8, y - 8, 16, 16), COLORS["black"], self.small_font)
 
     def draw_troops(self) -> None:
         for troop in self.troops:

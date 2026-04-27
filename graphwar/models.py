@@ -46,6 +46,9 @@ class Node:
     ruin_origin_type: str = ""
     ruin_origin_defense: int = 0
     ruin_origin_max_defense: int = 0
+    name_stem: str = ""
+    display_name: str = ""
+    name_variant_seed: int = 0
 
 
 @dataclass

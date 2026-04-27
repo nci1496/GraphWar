@@ -26,6 +26,43 @@ from graphwar.constants import (
 from graphwar.helpers import distance, distance_xy, is_recruitable, normalize_edge
 from graphwar.models import Edge, Node
 
+SURNAMES = [
+    "刘",
+    "曹",
+    "孙",
+    "吕",
+    "王",
+    "李",
+    "张",
+    "赵",
+    "黄",
+    "周",
+    "陈",
+    "杨",
+    "吴",
+    "朱",
+    "高",
+    "林",
+    "何",
+    "郭",
+    "马",
+    "袁",
+    "邓",
+    "徐",
+    "韩",
+    "宋",
+    "杜",
+    "程",
+    "严",
+    "贺",
+    "薛",
+    "傅",
+]
+
+FORT_NAMES = ["黑石隘", "断云塞", "落霞关", "虎踞隘", "青川塞", "长风关"]
+CAPITAL_NAMES = ["洛阳京", "长安府", "邺城王都", "许昌治所"]
+RUIN_PREFIX = ["残破", "荒弃", "焦土"]
+
 
 class MapLogicMixin:
     def generate_map(self) -> tuple[list[Node], list[Edge]]:
@@ -65,6 +102,7 @@ class MapLogicMixin:
 
         edges = self.build_edges(nodes)
         self.correct_forts(nodes, edges)
+        self.assign_node_names(nodes)
         return nodes, edges
 
     def assign_site_types(self, points: list[tuple[float, float]]) -> list[str]:
@@ -186,3 +224,80 @@ class MapLogicMixin:
         if roll < 0.32:
             return MOUNTAIN
         return PLAINS
+
+    def _pick_pool_name(self, pool: list[str], used: set[str]) -> str:
+        available = [name for name in pool if name not in used]
+        if available:
+            choice = self.rng.choice(available)
+            used.add(choice)
+            return choice
+        choice = self.rng.choice(pool)
+        used.add(choice)
+        return choice
+
+    def _normal_suffix(self, node: Node) -> str:
+        level = max(0, min(node.development_level, 4))
+        if node.development_line == LINE_MILITARY:
+            if level <= 0:
+                options = ["家庄"]
+            elif level == 1:
+                options = ["家堡", "坞"]
+            elif level == 2:
+                options = ["防城", "戍"]
+            elif level == 3:
+                options = ["塞", "隘"]
+            else:
+                options = ["京", "藩"]
+        else:
+            if level <= 0:
+                options = ["家集", "家埠"] if node.site_type == TOWN else ["家村"]
+            elif level == 1:
+                options = ["家集", "家埠"]
+            elif level == 2:
+                options = ["家镇", "津"]
+            elif level == 3:
+                options = ["陵", "邑"]
+            else:
+                options = ["郡", "府"]
+        seed = node.name_variant_seed if node.name_variant_seed > 0 else (node.id + 7)
+        return options[seed % len(options)]
+
+    def compose_normal_name(self, node: Node) -> str:
+        if not node.name_stem:
+            node.name_stem = self._pick_pool_name(SURNAMES, self._used_surnames)
+        return f"{node.name_stem}{self._normal_suffix(node)}"
+
+    def apply_ruin_display_name(self, node: Node, base_name: str | None = None) -> None:
+        base = base_name or node.display_name or self.compose_normal_name(node)
+        seed = node.name_variant_seed if node.name_variant_seed > 0 else (node.id + 3)
+        prefix = RUIN_PREFIX[seed % len(RUIN_PREFIX)]
+        node.display_name = f"{prefix}{base}"
+
+    def refresh_node_display_name(self, node: Node) -> None:
+        if node.name_variant_seed <= 0:
+            node.name_variant_seed = self.rng.randint(1, 1000000)
+        if node.is_ruin:
+            self.apply_ruin_display_name(node)
+            return
+        if node.site_type == CAPITAL:
+            if not node.display_name or node.name_stem:
+                node.display_name = self._pick_pool_name(CAPITAL_NAMES, self._used_capital_names)
+            node.name_stem = ""
+            return
+        if node.site_type == FORT:
+            if not node.display_name or node.name_stem:
+                node.display_name = self._pick_pool_name(FORT_NAMES, self._used_fort_names)
+            node.name_stem = ""
+            return
+        node.display_name = self.compose_normal_name(node)
+
+    def assign_node_names(self, nodes: list[Node]) -> None:
+        self._used_surnames: set[str] = set()
+        self._used_fort_names: set[str] = set()
+        self._used_capital_names: set[str] = set()
+        for node in nodes:
+            node.name_stem = ""
+            node.display_name = ""
+            node.name_variant_seed = self.rng.randint(1, 1000000)
+        for node in nodes:
+            self.refresh_node_display_name(node)

@@ -91,6 +91,7 @@ class RebelLogicMixin:
     def apply_rebel_ruin(self, target: Node) -> None:
         if target.site_type not in (VILLAGE, TOWN):
             return
+        previous_name = target.display_name
         target.ruin_origin_defense = int(max(0, target.defense))
         target.ruin_origin_max_defense = int(max(target.ruin_origin_defense, target.max_defense))
         target.is_ruin = True
@@ -108,6 +109,7 @@ class RebelLogicMixin:
         target.population = 0.0
         target.max_population = 0.0
         target.morale = 0.0
+        self.apply_ruin_display_name(target, previous_name)
     def repair_ruin_selected(self) -> None:
         if self.selected is None:
             return
@@ -149,6 +151,7 @@ class RebelLogicMixin:
             node.max_defense = 2
         node.ruin_origin_defense = 0
         node.ruin_origin_max_defense = 0
+        self.refresh_node_display_name(node)
 
         desired_population = float(stats["population"][0])
         moved, avg_morale = self.request_auto_population(node.id, desired_population)

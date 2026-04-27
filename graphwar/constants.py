@@ -1,3 +1,4 @@
+# 窗口与面板布局
 WIDTH = 1280
 HEIGHT = 780
 FPS = 60
@@ -7,37 +8,45 @@ SIDE_PANEL = 300
 MAP_LEFT = LEFT_PANEL
 MAP_RIGHT = WIDTH - SIDE_PANEL
 
+# 阵营标识
 PLAYER = "player"
 ENEMY = "enemy"
 NEUTRAL = "neutral"
 REBEL = "rebel"
 
+# 据点类型
 CAPITAL = "capital"
 TOWN = "town"
 FORT = "fort"
 VILLAGE = "village"
 
+# 道路地形类型
 PLAINS = "plains"
 MOUNTAIN = "mountain"
 FORD = "ford"
 
+# 行军意图
 INTENT_OCCUPY = "occupy"
 INTENT_ATTACK = "attack"
 INTENT_SACK = "sack"
 INTENT_MIGRATE = "migrate"
 
+# 发展线类型
 LINE_ECONOMY = "economy"
 LINE_MILITARY = "military"
 
+# 运输货物类型
 CONVOY_FOOD = "food"
 CONVOY_GOLD = "gold"
 CONVOY_POP = "population"
 
+# 征兵政策档位
 POLICY_STOP = "stop"
 POLICY_LOW = "low"
 POLICY_NORMAL = "normal"
 POLICY_HIGH = "high"
 
+# 经济与建设核心参数
 REMIT_INTERVAL = 12.0
 REMIT_RATE = 0.5
 FORTIFY_COST = 80
@@ -46,6 +55,7 @@ ROAD_COST = 70
 UPGRADE_COST = 120
 MAX_ROAD_LEVEL = 3
 MAX_DEVELOPMENT_LEVEL = 4
+# 出兵与补给参数
 TROOP_BATCH_SIZE = 12
 TROOP_BATCH_INTERVAL = 0.35
 UNSUPPLIED_POWER = 0.4
@@ -60,6 +70,7 @@ LOW_FOOD_AUTO_SUPPLY_THRESHOLD_HIGH = 200.0
 DEMOBILIZE_RATIO = 0.25
 DEMOBILIZE_MORALE_BONUS = 8.0
 
+# 黄巾与起义参数
 REBEL_WARNING_SECONDS = 30.0
 REBEL_SPEED_BOOST_MULTIPLIER = 3.0
 REBEL_SPEED_BOOST_DURATION = 30.0
@@ -75,6 +86,7 @@ LOW_FOOD_MORALE_THRESHOLD = 200.0
 LOW_FOOD_MORALE_DROP = 0.55
 ZERO_FOOD_MORALE_DROP = 1.15
 
+# 皇帝与都城系统参数
 EMPEROR_MOVE_SPEED_MULTIPLIER = 1.5
 EMPEROR_NODE_MORALE_CAP = 120.0
 EMPEROR_MORALE_RECOVERY_MULT = 1.25
@@ -89,12 +101,14 @@ ANNEX_BASE_COST = 200.0
 ANNEX_PER_SOLDIER_COST = 2.0
 AI_MOVE_CAPITAL_COOLDOWN = 24.0
 
+# 地图规模预设
 MAP_SIZE_PRESETS = {
     "small": {"label": "小图", "nodes": 13, "spacing": 118},
     "medium": {"label": "中图", "nodes": 18, "spacing": 96},
     "large": {"label": "大图", "nodes": 24, "spacing": 82},
 }
 
+# 据点基础属性
 SITE_STATS = {
     CAPITAL: {
         "label": "都城",
@@ -150,6 +164,7 @@ SITE_STATS = {
     },
 }
 
+# 经济线与军事线成长曲线
 ECONOMY_LINE = [
     {"name": "村庄", "pop": 1.00, "food": 1.00, "gold": 1.00, "defense": 0, "prod": 1.00, "upkeep": 1.00},
     {"name": "农贸集镇", "pop": 1.30, "food": 1.55, "gold": 1.80, "defense": 1, "prod": 0.98, "upkeep": 0.96},
@@ -166,12 +181,14 @@ MILITARY_LINE = [
     {"name": "镇国雄都", "pop": 1.20, "food": 1.10, "gold": 1.20, "defense": 9, "prod": 1.45, "upkeep": 1.30},
 ]
 
+# 地形移动与损耗参数
 TERRAIN_STATS = {
     PLAINS: {"label": "平原道", "speed": 0.15, "loss": 0.03, "color": (123, 92, 54), "width": 2},
     MOUNTAIN: {"label": "山路", "speed": 0.09, "loss": 0.12, "color": (95, 74, 48), "width": 3},
     FORD: {"label": "渡口", "speed": 0.12, "loss": 0.08, "color": (75, 103, 107), "width": 3},
 }
 
+# 征兵策略参数
 RECRUIT_POLICIES = {
     POLICY_STOP: {"label": "停止", "rate": 0.0, "morale": 1.2},
     POLICY_LOW: {"label": "低征兵", "rate": 0.16, "morale": 0.15},
@@ -179,6 +196,7 @@ RECRUIT_POLICIES = {
     POLICY_HIGH: {"label": "强征", "rate": 0.82, "morale": -0.75},
 }
 
+# 行军意图文案
 INTENT_LABELS = {
     INTENT_OCCUPY: "占领",
     INTENT_ATTACK: "攻打",
@@ -186,6 +204,7 @@ INTENT_LABELS = {
     INTENT_MIGRATE: "迁徙",
 }
 
+# 颜色主题
 COLORS = {
     "bg": (132, 91, 48),
     "map": (172, 129, 74),

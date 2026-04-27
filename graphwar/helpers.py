@@ -68,6 +68,9 @@ def owner_label(owner: str) -> str:
 
 
 def site_label(node: Node) -> str:
+    display = getattr(node, "display_name", "")
+    if display:
+        return f"{display}#{node.id}"
     return f"{development_name(node)} {node.id}"
 
 
