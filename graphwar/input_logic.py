@@ -179,6 +179,23 @@ class InputLogicMixin:
                 self.message = f"军事线<1/2 自动调粮已{state}。"
             return True
 
+        for action, rect in self.emperor_buttons():
+            if not rect.collidepoint(pos):
+                continue
+            if action == "emperor_tour":
+                if self.selected is None:
+                    self.message = "皇帝出巡失败：请先选中我方据点。"
+                    return True
+                node = self.nodes[self.selected]
+                if node.owner != PLAYER:
+                    self.message = "皇帝出巡失败：请先选中我方据点。"
+                    return True
+                self.command_player_emperor_tour(node.id)
+                return True
+            if action == "emperor_return":
+                self.command_player_emperor_return()
+                return True
+
         if self.selected is None:
             return False
         node = self.nodes[self.selected]
@@ -226,5 +243,9 @@ class InputLogicMixin:
                 self.destroy_selected_stock()
             elif action == "demobilize":
                 self.demobilize_selected()
+            elif action == "emperor_tour":
+                self.command_player_emperor_tour(node.id)
+            elif action == "emperor_return":
+                self.command_player_emperor_return()
             return True
         return False

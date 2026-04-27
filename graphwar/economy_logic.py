@@ -334,7 +334,7 @@ class EconomyLogicMixin:
         capital = self.player_capital()
         if capital is None:
             return
-        capital.max_gold = CAPITAL_GOLD_CAP
+        capital.max_gold = self.capital_gold_cap(capital)
         for node in self.nodes:
             if (
                 node.owner == PLAYER

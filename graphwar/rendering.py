@@ -78,13 +78,14 @@ class RenderingMixin:
         rebel_count = sum(1 for n in self.nodes if n.owner == REBEL)
         warning_count = sum(1 for n in self.nodes if n.rebel_warning)
         capital = self.player_capital()
+        emperor_text = self.player_emperor_status_text()
         capital_text = "都城失守"
         if capital is not None:
             capital_text = f"都城 粮{int(capital.food)} 金{int(capital.gold)}/{int(capital.max_gold)}"
         text = (
             f"诸侯征战 | {capital_text} | 汉{player_count} 敌{enemy_count} 中立{neutral_count} 黄巾{rebel_count} 预警{warning_count} | "
             f"兵团{len(self.troops)} 运输{len(self.convoys)} | 地图{MAP_SIZE_PRESETS[self.map_size_mode]['label']} | "
-            f"行军{INTENT_LABELS[self.intent]} 比例{int(self.send_ratio * 100)}%"
+            f"行军{INTENT_LABELS[self.intent]} 比例{int(self.send_ratio * 100)}% | 皇帝{emperor_text}"
         )
         self.draw_text(text, 18, 11, COLORS["text"])
         self.draw_text(self.message, 18, 42, COLORS["muted"])
@@ -120,6 +121,10 @@ class RenderingMixin:
 
     def draw_nodes(self) -> None:
         focus_id = self.selected if self.selected is not None else self.inspecting
+        emperor_marks: dict[int, str] = {}
+        for owner, emperor in self.emperors.items():
+            if emperor.alive and emperor.current_node >= 0 and emperor.current_node < len(self.nodes):
+                emperor_marks[emperor.current_node] = owner
         for node in self.nodes:
             color = COLORS["rebel_warning"] if node.rebel_warning else COLORS[node.owner]
             pos = (round(node.x), round(node.y))
@@ -136,6 +141,12 @@ class RenderingMixin:
                 self.draw_centered_text(f"民{int(node.morale)}", pygame.Rect(node.x - 25, node.y - radius - 22, 50, 18), COLORS["gold"], self.small_font)
             if node.rebel_warning:
                 self.draw_centered_text(f"{int(node.rebel_warning_timer)}", pygame.Rect(node.x - 20, node.y + 10, 40, 18), COLORS["black"], self.small_font)
+            emperor_owner = emperor_marks.get(node.id)
+            if emperor_owner is not None:
+                marker_center = (pos[0] + radius - 4, pos[1] - radius + 4)
+                pygame.draw.circle(self.screen, COLORS["white"], marker_center, 10)
+                pygame.draw.circle(self.screen, COLORS[emperor_owner], marker_center, 8)
+                self.draw_centered_text("帝", pygame.Rect(marker_center[0] - 8, marker_center[1] - 8, 16, 16), COLORS["black"], self.small_font)
 
     def draw_troops(self) -> None:
         for troop in self.troops:
@@ -243,7 +254,13 @@ class RenderingMixin:
             pygame.draw.rect(self.screen, COLORS["muted"], button, 1, border_radius=6)
             self.draw_centered_text(INTENT_LABELS[intent], button, COLORS["text"], self.small_font)
 
-        info_y = TOP_BAR + 168
+        for action, button in self.emperor_buttons():
+            pygame.draw.rect(self.screen, COLORS["panel_hover"], button, border_radius=6)
+            pygame.draw.rect(self.screen, COLORS["muted"], button, 1, border_radius=6)
+            label = "皇帝出巡" if action == "emperor_tour" else "皇帝回都"
+            self.draw_centered_text(label, button, COLORS["text"], self.small_font)
+        self.draw_text(f"皇帝状态：{self.player_emperor_status_text()}", x, TOP_BAR + 204, COLORS["muted"], self.small_font)
+        info_y = TOP_BAR + 230
         if self.convoy_mode is not None and self.convoy_route:
             route_text = "->".join(str(node_id) for node_id in self.convoy_route)
             route_y = TOP_BAR + 148
@@ -381,6 +398,14 @@ class RenderingMixin:
             (INTENT_ATTACK, pygame.Rect(x + (w + gap), y, w, h)),
             (INTENT_SACK, pygame.Rect(x + (w + gap) * 2, y, w, h)),
             (INTENT_MIGRATE, pygame.Rect(x + (w + gap) * 3, y, w, h)),
+        ]
+
+    def emperor_buttons(self) -> list[tuple[str, pygame.Rect]]:
+        x = MAP_RIGHT + 18
+        y = TOP_BAR + 152
+        return [
+            ("emperor_tour", pygame.Rect(x, y, 126, 30)),
+            ("emperor_return", pygame.Rect(x + 136, y, 126, 30)),
         ]
 
     def auto_fund_buttons(self) -> list[tuple[str, pygame.Rect]]:

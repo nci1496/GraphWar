@@ -44,6 +44,8 @@ class Node:
     rebel_warning_timer: float = 0.0
     is_ruin: bool = False
     ruin_origin_type: str = ""
+    ruin_origin_defense: int = 0
+    ruin_origin_max_defense: int = 0
 
 
 @dataclass

@@ -126,6 +126,8 @@ class MapLogicMixin:
         node.rebel_warning_timer = 0.0
         node.is_ruin = False
         node.ruin_origin_type = ""
+        node.ruin_origin_defense = 0
+        node.ruin_origin_max_defense = 0
         if node.site_type == FORT:
             node.population = 0.0
             node.max_population = 0.0

@@ -91,6 +91,8 @@ class RebelLogicMixin:
     def apply_rebel_ruin(self, target: Node) -> None:
         if target.site_type not in (VILLAGE, TOWN):
             return
+        target.ruin_origin_defense = int(max(0, target.defense))
+        target.ruin_origin_max_defense = int(max(target.ruin_origin_defense, target.max_defense))
         target.is_ruin = True
         target.ruin_origin_type = target.site_type
         target.food = 0.0
@@ -136,12 +138,17 @@ class RebelLogicMixin:
         node.food = float(stats["food"][0])
         node.max_gold = float(max(stats["gold"][1], 1))
         node.local_gold = node.gold
-        if origin == VILLAGE:
+        if node.ruin_origin_max_defense > 0:
+            node.max_defense = int(node.ruin_origin_max_defense)
+            node.defense = int(min(node.max_defense, max(0, node.ruin_origin_defense)))
+        elif origin == VILLAGE:
             node.defense = 0
             node.max_defense = 1
         else:
             node.defense = 1
             node.max_defense = 2
+        node.ruin_origin_defense = 0
+        node.ruin_origin_max_defense = 0
 
         desired_population = float(stats["population"][0])
         moved, avg_morale = self.request_auto_population(node.id, desired_population)

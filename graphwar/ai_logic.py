@@ -8,6 +8,7 @@ from .constants import (
     CAPITAL,
     CONVOY_FOOD,
     CONVOY_GOLD,
+    ENEMY,
     FOOD_PER_TROOP_LAUNCH,
     FORT,
     FORTIFY_COST,
@@ -18,8 +19,14 @@ from .constants import (
     MAX_DEVELOPMENT_LEVEL,
     MAX_ROAD_LEVEL,
     NEUTRAL,
+    PLAYER,
+    POLICY_LOW,
+    POLICY_NORMAL,
+    POLICY_STOP,
     REBEL,
+    REBEL_RUIN_REPAIR_COST,
     ROAD_COST,
+    SITE_STATS,
     TERRAIN_STATS,
     TOWN,
     UPGRADE_COST,
@@ -70,6 +77,7 @@ class GraphWarAI:
             score += node.gold * 0.040
             score += node.development_level * 18.0
             score += self._node_value(game, node, owner)
+            score -= self._rebel_risk_penalty(game, node, owner)
             if node.supply_blocked_time > 0:
                 score -= 16.0 * min(node.supply_blocked_time, 12.0)
             if node.food < max(20.0, node.soldiers * 0.35):
@@ -101,6 +109,19 @@ class GraphWarAI:
                     candidates.append(AIAction("rebel_attack", source.id, target.id, ratio=0.65, intent=INTENT_ATTACK))
                 continue
 
+            rebel_risk = self._rebel_risk_level(game, source, owner)
+            if rebel_risk >= 2 and source.recruit_policy != POLICY_STOP:
+                candidates.append(AIAction("set_recruit_policy", source.id, intent=POLICY_STOP))
+            elif rebel_risk >= 1 and source.recruit_policy == POLICY_NORMAL:
+                candidates.append(AIAction("set_recruit_policy", source.id, intent=POLICY_LOW))
+            elif (
+                rebel_risk == 0
+                and source.recruit_policy == POLICY_STOP
+                and source.morale >= 55
+                and source.soldiers < game.garrison_limit(source) * 0.8
+            ):
+                candidates.append(AIAction("set_recruit_policy", source.id, intent=POLICY_LOW))
+
             # Expansion / attack / reinforce.
             if source.soldiers >= 10:
                 for nid in game.neighbor_ids(source.id):
@@ -115,6 +136,8 @@ class GraphWarAI:
                             candidates.append(
                                 AIAction("reinforce", source.id, target.id, ratio=ratio, intent=INTENT_ATTACK)
                             )
+                        if source.soldiers >= 14 and self._rebel_risk_level(game, target, owner) >= 2:
+                            candidates.append(AIAction("reinforce", source.id, target.id, ratio=0.30, intent=INTENT_ATTACK))
                     else:
                         ratio = 0.50 if target.owner == NEUTRAL else 0.60
                         intent = INTENT_OCCUPY if target.soldiers <= 0 else INTENT_ATTACK
@@ -147,6 +170,8 @@ class GraphWarAI:
 
             # Build actions.
             if source.is_ruin:
+                if source.gold >= REBEL_RUIN_REPAIR_COST:
+                    candidates.append(AIAction("repair_ruin", source.id))
                 continue
             if source.gold >= FORTIFY_COST and self._frontline_threat(game, source, owner) > 0:
                 candidates.append(AIAction("fortify", source.id))
@@ -282,6 +307,52 @@ class GraphWarAI:
             node.development_level += 1
             game.apply_development(node)
             return True
+
+        if action.kind == "set_recruit_policy":
+            if owner == REBEL:
+                return False
+            node = game.nodes[action.source_id]
+            if node.owner != owner or node.is_ruin or node.max_population <= 0:
+                return False
+            if action.intent not in (POLICY_STOP, POLICY_LOW, POLICY_NORMAL):
+                return False
+            node.recruit_policy = action.intent
+            return True
+
+        if action.kind == "repair_ruin":
+            if owner == REBEL:
+                return False
+            node = game.nodes[action.source_id]
+            if node.owner != owner or not node.is_ruin or node.gold < REBEL_RUIN_REPAIR_COST:
+                return False
+            origin = node.ruin_origin_type if node.ruin_origin_type in (VILLAGE, TOWN) else VILLAGE
+            stats = SITE_STATS[origin]
+            node.gold -= REBEL_RUIN_REPAIR_COST
+            node.site_type = origin
+            node.is_ruin = False
+            node.sacked = False
+            node.ruin_origin_type = ""
+            node.development_level = 0
+            node.development_line = LINE_ECONOMY
+            node.max_population = float(stats["population"][1])
+            node.population = float(stats["population"][0] * 0.7)
+            node.max_food = float(max(stats["food"][1], 1))
+            node.food = float(stats["food"][0])
+            node.max_gold = float(max(stats["gold"][1], 1))
+            node.local_gold = node.gold
+            if node.ruin_origin_max_defense > 0:
+                node.max_defense = int(node.ruin_origin_max_defense)
+                node.defense = int(min(node.max_defense, max(0, node.ruin_origin_defense)))
+            elif origin == VILLAGE:
+                node.defense = 0
+                node.max_defense = 1
+            else:
+                node.defense = 1
+                node.max_defense = 2
+            node.ruin_origin_defense = 0
+            node.ruin_origin_max_defense = 0
+            node.morale = max(35.0, min(55.0, node.morale))
+            return True
         return False
 
     def _estimate_action_gain(self, game, owner: str, action: AIAction) -> float:
@@ -405,6 +476,24 @@ class GraphWarAI:
                 mil_gain -= 18.0
             return base + mil_gain + upkeep_penalty - cost * 0.17
 
+        if action.kind == "set_recruit_policy":
+            node = game.nodes[action.source_id]
+            if node.owner != owner or node.is_ruin or node.max_population <= 0:
+                return -999.0
+            risk_penalty = self._rebel_risk_penalty(game, node, owner)
+            if action.intent == POLICY_STOP:
+                return 12.0 + risk_penalty * 0.45 + max(0.0, 55.0 - node.morale) * 0.35
+            if action.intent == POLICY_LOW:
+                return 8.0 + risk_penalty * 0.30 + max(0.0, 45.0 - node.morale) * 0.22
+            return 3.0 - risk_penalty * 0.20
+
+        if action.kind == "repair_ruin":
+            node = game.nodes[action.source_id]
+            if node.owner != owner or not node.is_ruin or node.gold < REBEL_RUIN_REPAIR_COST:
+                return -999.0
+            pressure = self._frontline_threat(game, node, owner)
+            return 42.0 + pressure * 10.0 - REBEL_RUIN_REPAIR_COST * 0.18
+
         return -999.0
 
     def _projected_attack_power(self, source: Node, target: Node, edge: Edge, amount: float) -> float:
@@ -456,6 +545,48 @@ class GraphWarAI:
         if len(game.neighbor_ids(a.id)) >= 4 or len(game.neighbor_ids(b.id)) >= 4:
             value += 0.8
         return value
+
+    def _rebel_risk_level(self, game, node: Node, owner: str) -> int:
+        if owner not in (PLAYER, ENEMY):
+            return 0
+        if node.owner != owner or node.max_population <= 0 or node.site_type in (FORT, CAPITAL):
+            return 0
+        risk = 0
+        if node.morale < 30:
+            risk += 2
+        elif node.morale < 60:
+            risk += 1
+        if node.soldiers < 10:
+            risk += 2
+        elif node.soldiers < 16:
+            risk += 1
+        if node.food < max(20.0, node.soldiers * 0.35):
+            risk += 1
+        rebel_pressure = 0.0
+        for nid in game.neighbor_ids(node.id):
+            other = game.nodes[nid]
+            if other.owner == REBEL:
+                rebel_pressure += 1.0 + other.soldiers / 35.0
+        if rebel_pressure >= 2.5:
+            risk += 2
+        elif rebel_pressure > 0:
+            risk += 1
+        if node.rebel_warning:
+            risk += 1
+        return risk
+
+    def _rebel_risk_penalty(self, game, node: Node, owner: str) -> float:
+        level = self._rebel_risk_level(game, node, owner)
+        if level <= 0:
+            return 0.0
+        penalty = float(level * level * 4.0)
+        if node.morale < 30:
+            penalty += 16.0
+        elif node.morale < 60:
+            penalty += 7.0
+        if node.soldiers < 10:
+            penalty += 14.0
+        return penalty
 
     def _frontline_threat(self, game, node: Node, owner: str) -> float:
         threat = 0.0

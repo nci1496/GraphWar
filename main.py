@@ -14,6 +14,7 @@ from graphwar.constants import (
     FPS,
     HEIGHT,
     INTENT_ATTACK,
+    LINE_ECONOMY,
     MAX_ROAD_LEVEL,
     NEUTRAL,
     PLAYER,
@@ -113,7 +114,7 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
         self.nodes, self.edges = self.generate_map()
         capital = self.player_capital()
         if capital is not None:
-            capital.max_gold = CAPITAL_GOLD_CAP
+            capital.max_gold = self.capital_gold_cap(capital)
             capital.gold = min(capital.gold, capital.max_gold)
             capital.local_gold = capital.gold
             self.treasury = capital.gold
@@ -193,6 +194,16 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
             return gold_rate, morale_recovery
         return gold_rate * EMPEROR_GOLD_PROD_MULT, morale_recovery * EMPEROR_MORALE_RECOVERY_MULT
 
+    def capital_gold_cap(self, node: Node) -> float:
+        if node.site_type != CAPITAL:
+            return node.max_gold
+        level = max(0, min(node.development_level, 4))
+        if node.development_line == LINE_ECONOMY:
+            caps = (CAPITAL_GOLD_CAP, 900.0, 1300.0, 1800.0, 2200.0)
+        else:
+            caps = (CAPITAL_GOLD_CAP, 750.0, 900.0, 1200.0, 1500.0)
+        return caps[level]
+
     def update_emperors(self, dt: float) -> None:
         for owner, emperor in self.emperors.items():
             if not emperor.alive:
@@ -268,6 +279,79 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
             self.message = f"皇帝已启程前往 {site_label(target)}。"
         return True
 
+    def player_emperor_status_text(self) -> str:
+        emperor = self.emperors.get(PLAYER)
+        if emperor is None:
+            return "无皇帝"
+        if not emperor.alive:
+            return "已驾崩"
+        if emperor.current_node >= 0:
+            if emperor.current_node >= len(self.nodes):
+                return "状态异常"
+            node = self.nodes[emperor.current_node]
+            capital = self.owner_capital(PLAYER)
+            if capital is not None and node.id == capital.id:
+                return f"在都({site_label(node)})"
+            return f"驻于{site_label(node)}"
+        if len(emperor.route) >= 2 and emperor.route_index < len(emperor.route) - 1:
+            src_id = emperor.route[emperor.route_index]
+            dst_id = emperor.route[emperor.route_index + 1]
+            if 0 <= src_id < len(self.nodes) and 0 <= dst_id < len(self.nodes):
+                src = self.nodes[src_id]
+                dst = self.nodes[dst_id]
+                return f"行军{site_label(src)}->{site_label(dst)}"
+        return "行军中"
+
+    def command_player_emperor_tour(self, target_id: int) -> bool:
+        if target_id < 0 or target_id >= len(self.nodes):
+            self.message = "皇帝出巡失败：目标无效。"
+            return False
+        target = self.nodes[target_id]
+        if target.owner != PLAYER:
+            self.message = "皇帝出巡失败：只能前往我方据点。"
+            return False
+        emperor = self.emperors.get(PLAYER)
+        if emperor is None:
+            self.message = "皇帝出巡失败：我方未建立皇帝状态。"
+            return False
+        if not emperor.alive:
+            self.message = "皇帝出巡失败：皇帝已驾崩。"
+            return False
+        if emperor.current_node < 0:
+            self.message = "皇帝出巡失败：皇帝正在行军中。"
+            return False
+        if emperor.current_node == target_id:
+            self.message = "皇帝已在该据点。"
+            return False
+        if not self.move_emperor(PLAYER, target_id):
+            self.message = "皇帝出巡失败：无可用路径或条件不满足。"
+            return False
+        return True
+
+    def command_player_emperor_return(self) -> bool:
+        emperor = self.emperors.get(PLAYER)
+        if emperor is None:
+            self.message = "皇帝回都失败：我方未建立皇帝状态。"
+            return False
+        if not emperor.alive:
+            self.message = "皇帝回都失败：皇帝已驾崩。"
+            return False
+        capital = self.player_capital()
+        if capital is None:
+            self.message = "皇帝回都失败：当前无我方都城。"
+            return False
+        if emperor.current_node < 0:
+            self.message = "皇帝回都失败：皇帝正在行军中。"
+            return False
+        if emperor.current_node == capital.id:
+            self.message = "皇帝已在都城。"
+            return False
+        if not self.move_emperor(PLAYER, capital.id):
+            self.message = "皇帝回都失败：无可用路径或条件不满足。"
+            return False
+        self.message = f"皇帝回都：已启程前往 {site_label(capital)}。"
+        return True
+
     def apply_emperor_leave_capital_penalty(self, owner: str) -> None:
         emperor = self.emperors.get(owner)
         if emperor is None or not emperor.alive or emperor.current_node < 0:
@@ -303,7 +387,7 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
         node.max_defense += 2
         node.defense = min(node.max_defense, node.defense + 2)
         node.max_population = max(node.max_population, SITE_STATS[CAPITAL]["population"][1])
-        node.max_gold = max(node.max_gold, CAPITAL_GOLD_CAP)
+        node.max_gold = self.capital_gold_cap(node)
         node.gold = min(node.gold, node.max_gold)
         self.capital_node_ids[owner] = node.id
         emperor = self.emperors.get(owner)
@@ -535,7 +619,7 @@ class GraphWar(CombatLogicMixin, EconomyLogicMixin, RebelLogicMixin, InputLogicM
         node.max_food = max(node.max_food, SITE_STATS[node.site_type]["food"][1] * data["food"])
         node.max_gold = max(node.max_gold, SITE_STATS[node.site_type]["gold"][1] * data["gold"])
         if node.site_type == CAPITAL:
-            node.max_gold = CAPITAL_GOLD_CAP
+            node.max_gold = self.capital_gold_cap(node)
             node.gold = min(node.gold, node.max_gold)
             node.local_gold = node.gold
             self.treasury = node.gold
